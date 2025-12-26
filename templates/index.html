@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    
+    <title>Dashboard · Expense Tracker</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: { extend: { colors: { brand: { DEFAULT: "#38bdf8" } } } },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+
+  <body class="h-full bg-slate-900 text-slate-100">
+    <main class="mx-auto max-w-6xl px-4 py-8">
+      <!-- Page Heading -->
+  <header class="mb-8 text-center">
+  <h1 class="text-4xl font-extrabold tracking-wide">
+    <span class="text-blue-900">EXPENSE</span>
+    <span class="text-blue-400">TRACKER</span>
+  </h1>
+
+  <p class="mt-2 text-slate-400 text-sm">
+    Track, analyze & control your spending
+  </p>
+</header>
+
+
+      <h1 class="text-3xl font-semibold mb-2">Dashboard</h1>
+      <p class="text-slate-400 mb-6">
+        Track spending, filter by date/category, and visualize instantly.
+      </p>
+
+      <!-- FLASH MESSAGES -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="mb-4 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-green-300">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <!-- FILTERS (future-ready) -->
+        <section class="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <h2 class="text-lg font-semibold mb-3">Filters</h2>
+
+          <form method="get" action="/" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end pr-5">
+            <label class="text-sm">
+              <span class="block mb-1 text-slate-300">Start</span>
+              <input value="{{start_str or ''}}" type="date" name="start"
+                class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+            </label>
+
+            <label class="text-sm">
+              <span class="block mb-1 text-slate-300">End</span>
+              <input value="{{end_str or ''}}" type="date" name="end"
+                class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+            </label>
+
+            <label class="text-sm md:col-span-2">
+              <span class="block mb-1 text-slate-300">Category</span>
+              <select name="category"
+                class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+                <option value="">All</option>
+                {% for c in categories %}
+                
+                <option value="{{c}}" {% if selected_category == c %}
+                  selected
+                {% endif %}>{{c}}</option>
+                
+                {% endfor %}
+              </select>
+            </label>
+
+            <button
+              class="rounded-xl bg-brand/20 hover:bg-brand/30 text-brand px-4 py-2 border border-brand/30">
+              Apply
+            </button>
+          </form>
+        
+           <!-- Total
+          <div class="mt-4 text-sm text-slate-300">
+            <span class="mr-2">Total:</span>
+            <span
+              class="inline-block rounded-xl border border-slate-700 bg-slate-800 px-3 py-1 font-semibold"
+            >
+              $0.00
+            </span>
+          </div> -->
+
+          <!-- Export link -->
+          <div class="mt-3">
+            <a
+              class="text-xs text-slate-400 hover:text-brand underline"
+              href="{{url_for('export_csv', start=start_str, end=end_str, category=selected_category)}}"
+            >
+              Export CSV (current filter)
+            </a>
+          </div>
+        
+
+        </section>
+
+       
+
+        <!-- ADD EXPENSE -->
+        <section class="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <h2 class="text-lg font-semibold mb-3">Add Expense</h2>
+
+          <form method="POST" action="/add" class="space-y-3">
+            <label class="block text-sm">
+              <span class="mb-1 block text-slate-300">Description</span>
+              <input name="description" required
+                class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+            </label>
+
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm">
+                <span class="mb-1 block text-slate-300">Amount</span>
+                <input name="amount" type="number" step="0.01" required
+                  class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+              </label>
+
+              <label class="block text-sm">
+                <span class="mb-1 block text-slate-300">Date</span>
+                <input name="date" type="date" required
+                  class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+              </label>
+            </div>
+
+            <label class="block text-sm">
+              <span class="mb-1 block text-slate-300">Category</span>
+              <select name="category" required
+                class="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2">
+
+                {% for c in categories %}
+                  
+                
+                <option value="{{c}}">{{c}}</option>
+                
+                {% endfor %}
+              </select>
+            </label>
+
+            <button
+              class="w-full rounded-xl bg-brand/20 hover:bg-brand/30 text-brand px-4 py-2 border border-brand/30">
+              Add Expense
+            </button>
+          </form>
+        </section>
+      </div>
+
+      <!-- Total (global) -->
+       <div class="mb-3 mt-6">
+        <span class="text-sm text-slate-300 mr-2">Total:</span>
+          <span class="inline-block rounded-xl border border-slate-700 bg-slate-800 px-3 py-1 font-semibold">
+            Rs{{'%.2f'| format(total or 0)}}
+          </span>
+       </div>
+
+      <!-- EXPENSES TABLE -->
+      <section class="mt-6 rounded-2xl border border-slate-800 bg-slate-900">
+        <div class="px-4 py-3 border-b border-slate-800">
+          <h2 class="text-lg font-semibold">Expenses</h2>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-slate-300 bg-slate-800/50">
+              <tr>
+                <th class="text-left px-4 py-3">Date</th>
+                <th class="text-left px-4 py-3">Description</th>
+                <th class="text-left px-4 py-3">Category</th>
+                <th class="text-right px-4 py-3">Amount</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% if expense %}
+                {% for e in expense %}
+                  <tr class="border-t border-slate-800">
+                    <td class="px-4 py-2">{{ e.date.strftime("%Y-%m-%d") if e.date else '' }}</td>
+                    <td class="px-4 py-2">{{ e.description }}</td>
+                    <td class="px-4 py-2">{{ e.category }}</td>
+                    <td class="px-4 py-2 text-right">₹{{ "%.2f"|format(e.amount) }}</td>
+                    <td class="px-4 py-2 text-right">
+
+                    <div class="inline-flex gap-2">
+
+                      <a class="text-sky-300 hover:text-sky-100 text-xs border border-sky-400/30 px-3 py-1 rounded-lg"
+                      href="{{url_for('edit', expense_id=e.id)}} "
+                      >EDIT</a>
+
+                      <form action="{{url_for('delete', expense_id=e.id)}}" method="post" onsubmit="return confirm('Are you sure you want to delete')">
+                      <button  
+                      class="text-rose-300 hover:text-rose-200 text-xs border border-rose-400/30 px-3 py-1 rounded-lg">
+                        Delete
+                      </button>
+                      </form>
+                    </div>
+
+                    </td>
+                  </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                  <td colspan="4" class="px-4 py-6 text-center text-slate-400">
+                    No expenses yet — add your first one above.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+       <!-- Charts -->
+<section class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+    <h3 class="font-semibold mb-2">By Category</h3>
+    <canvas id="catChart" height="140"></canvas>
+  </div>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+    <h3 class="font-semibold mb-2">Spending Over Time</h3>
+    <canvas id="dayChart" height="140"></canvas>
+  </div>
+</section>
+
+<script>
+  const catLabels = {{ (cat_labels or []) | tojson }};
+  const catValues = {{ (cat_values or []) | tojson }};
+
+  const dayLabels = {{ (day_labels or []) | tojson }};
+  const dayValues = {{ (day_values or []) | tojson }};
+
+  if (catLabels.length && catValues.length) {
+    const catCtx = document.getElementById('catChart').getContext('2d');
+
+    new Chart(catCtx, {
+      type: 'pie',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          data: catValues,
+          backgroundColor: [
+            '#f9a8d4', // soft rose
+  '#bae6fd', // light blue
+  '#1e3a8a', // dark blue
+  '#ec4899', // strong pink
+  '#a5b4fc'  // soft lavender (pairs perfectly with pink & blue)
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            labels: {
+              color: '#cbd5e1'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  if (dayLabels.length && dayValues.length) {
+    const dayCtx = document.getElementById('dayChart').getContext('2d');
+
+    new Chart(dayCtx, {
+      type: 'bar',
+      data: {
+        labels: dayLabels,
+        datasets: [{
+          data: dayValues,
+          backgroundColor: [
+            '#fbcfe8', // light pink
+            '#f9a8d4', // soft rose
+            '#f472b6', // pink
+            '#ec4899', // strong pink
+            '#be185d'  // deep magenta
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            labels: {
+              color: '#cbd5e1'
+            }
+          }
+        }
+      }
+    });
+  }
+
+</script>
+
+
+    </main>
+  </body>
+</html>
