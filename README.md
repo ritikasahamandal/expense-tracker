@@ -32,14 +32,18 @@ This project helps users record their expenses and visualize spending patterns t
 
 ## ⚙️ How to Run Locally
 
-### 1️⃣ Clone the repository
+### Clone the repository
 
 git clone https://github.com/ritikasahamandal/expense-tracker.git 
+##
 cd expense-tracker
 
-
+## In windows
 python -m venv env
+##
 env\Scripts\activate
+##
 pip install flask flask-sqlalchemy
+##
 python app.py
 
