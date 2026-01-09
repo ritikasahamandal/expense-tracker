@@ -1,28 +1,41 @@
-from flask import Flask, render_template, request, url_for, make_response, flash, redirect, Response
+from flask import (
+    Flask, render_template, request,
+    url_for, flash, redirect, Response
+)
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime, date as dt_date
 from sqlalchemy import func
+import os
 
+# ---------------- APP SETUP ----------------
 app = Flask(__name__)
-app.secret_key = "super-secret-key"
+app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key")
 
-app.config['SQLALCHEMY_DATABASE_URI']= 'sqlite:///expenses.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS']= False
+# ---------------- DATABASE CONFIG ----------------
+db_url = os.environ.get("DATABASE_URL")
+
+# Fix Render postgres:// issue
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+# PostgreSQL in production, SQLite locally
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///expenses.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db = SQLAlchemy(app)
 
+# ---------------- MODEL ----------------
 class Expense(db.Model):
-    id = db.Column(db.Integer, primary_key= True)
-    description= db.Column(db.String(500), nullable=False)
-    amount = db.Column(db.Float, nullable =False)
-    category =db.Column(db.String(50), nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(500), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    category = db.Column(db.String(50), nullable=False)
     date = db.Column(db.Date, nullable=False, default=date.today)
 
+# ---------------- CONSTANTS ----------------
+CATEGORIES = ["Food", "Transport", "Rent", "Utilities", "Health"]
 
-with app.app_context():
-    db.create_all()
-
-CATEGORIES=['Food','Transport','Rent','Utilities','Health']
-
+# ---------------- HELPERS ----------------
 def parse_date_or_none(s: str):
     if not s:
         return None
@@ -31,131 +44,122 @@ def parse_date_or_none(s: str):
     except ValueError:
         return None
 
-
+# ---------------- ROUTES ----------------
 @app.route("/")
 def index():
-    # 1 read query string
     start_str = (request.args.get("start") or "").strip()
-    end_str = request.args.get("end", "").strip()
-    selected_category= (request.args.get("category") or "").strip()
+    end_str = (request.args.get("end") or "").strip()
+    selected_category = (request.args.get("category") or "").strip()
 
-    # 2 parsing
+    start_date = parse_date_or_none(start_str)
+    end_date = parse_date_or_none(end_str)
 
-    start_date= parse_date_or_none(start_str)
-    end_date= parse_date_or_none(end_str)
+    if start_date and end_date and end_date < start_date:
+        flash("End date cannot be before start date", "error")
+        start_date = end_date = None
 
-    if start_date and end_date and end_date< start_date:
-        flash("End date cannot be before start date","error")
-        start_date=end_date=None
-        start_str=end_str=""
-        
-        q = Expense.query
-
-        if start_date:
-            q=q.filter(Expense.date>= start_date)
-        if end_date:
-            q= q.filter(Expense.date>=start_date)
-        if selected_category:
-            q=q.filter(Expense.category == selected_category)
-
-    expense =Expense.query.order_by(Expense.date.desc(), Expense.id.desc()).all()
-    total=round(sum(e.amount for e in expense),2)
-
-    cat_q= db.session.query(Expense.category, func.sum(Expense.amount))
+    # ---------- BASE QUERY ----------
+    q = Expense.query
 
     if start_date:
-        cat_q= cat_q.filter(Expense.date >= start_date)
+        q = q.filter(Expense.date >= start_date)
     if end_date:
-        cat_q=cat_q.filter(Expense.date <= end_date)
+        q = q.filter(Expense.date <= end_date)
     if selected_category:
-        cat_q=cat_q.filter(Expense.category == selected_category)
+        q = q.filter(Expense.category == selected_category)
 
-    cat_rows= cat_q.group_by(Expense.category).all()
-    print(cat_rows)
-    cat_labels=[c for c, _ in cat_rows]
-    cat_values=[round(float(s or 0), 2) for _, s in cat_rows]
-    # print(cat_values)
+    expenses = q.order_by(Expense.date.desc(), Expense.id.desc()).all()
+    total = round(sum(e.amount for e in expenses), 2)
 
+    # ---------- CATEGORY WISE (PIE CHART) ----------
+    cat_rows = (
+        db.session.query(
+            Expense.category,
+            func.sum(Expense.amount)
+        )
+        .filter(q.whereclause)
+        .group_by(Expense.category)
+        .all()
+    )
 
-    day_q= db.session.query(Expense.category, func.sum(Expense.amount))
+    cat_labels = [c for c, _ in cat_rows]
+    cat_values = [round(float(s or 0), 2) for _, s in cat_rows]
 
-    if start_date:
-        day_q= day_q.filter(Expense.date >= start_date)
-    if end_date:
-        day_q=day_q.filter(Expense.date <= end_date)
-    if selected_category:
-        day_q=day_q.filter(Expense.category == selected_category)
+    # ---------- DATE WISE (SPENDING OVER TIME) ----------
+    day_rows = (
+        db.session.query(
+            Expense.date,
+            func.sum(Expense.amount)
+        )
+        .filter(q.whereclause)
+        .group_by(Expense.date)
+        .order_by(Expense.date)
+        .all()
+    )
 
-    day_rows= day_q.group_by(Expense.category).order_by(Expense.date).all()
-    # print(cat_rows)
-    day_labels=[d.format() for d, _ in day_rows]
-    day_values=[round(float(s or 0), 2) for _, s in day_rows]
+    day_labels = [d.isoformat() for d, _ in day_rows]
+    day_values = [round(float(s or 0), 2) for _, s in day_rows]
 
-    return render_template("index.html",
-                           
+    return render_template(
+        "index.html",
+        categories=CATEGORIES,
+        today=date.today().isoformat(),
+        expense=expenses,
+        total=total,
+        start_date=start_date,
+        end_date=end_date,
+        selected_category=selected_category,
+        cat_labels=cat_labels,
+        cat_values=cat_values,
+        day_labels=day_labels,
+        day_values=day_values
+    )
 
-                           
-                           categories=CATEGORIES,
-                           today=date.today().isoformat(),
-                            expense=expense,
-                            total=total,
-                            start_date=start_date,
-                            end_date=end_date,
-                            selected_category= selected_category,
-                            cat_labels= cat_labels,
-                            cat_values= cat_values,
-                            day_labels=day_labels,
-                            day_values=day_values
-                            
-                            )
-
-@app.route("/add", methods=['POST'])
+# ---------------- ADD ----------------
+@app.route("/add", methods=["POST"])
 def add():
-
-    description= (request.form.get("description") or "").strip()
+    description = (request.form.get("description") or "").strip()
     amount_str = (request.form.get("amount") or "").strip()
-    category=(request.form.get("category") or "").strip()
-    date_str=(request.form.get("date") or "").strip()
-
+    category = (request.form.get("category") or "").strip()
+    date_str = (request.form.get("date") or "").strip()
 
     if not description or not amount_str or not category:
-        flash("Please fill description, amount amd category", "error")
-
+        flash("Please fill description, amount and category", "error")
+        return redirect(url_for("index"))
 
     try:
         amount = float(amount_str)
-        if amount <=0:
+        if amount <= 0:
             raise ValueError
-        
     except ValueError:
-        flash("Amount must be positive number", "error")
+        flash("Amount must be a positive number", "error")
         return redirect(url_for("index"))
 
-
     try:
-        d= datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
+        d = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else date.today()
     except ValueError:
-        d=date.today
-    e= Expense(description=description, amount=amount, category=category, date=d)
+        d = date.today()
+
+    e = Expense(description=description, amount=amount, category=category, date=d)
     db.session.add(e)
     db.session.commit()
 
-    flash("Expense added","success")
+    flash("Expense added successfully", "success")
     return redirect(url_for("index"))
 
-@app.route('/delete/<int:expense_id>', methods=['POST'])
+# ---------------- DELETE ----------------
+@app.route("/delete/<int:expense_id>", methods=["POST"])
 def delete(expense_id):
-    e= Expense.query.get_or_404(expense_id)
+    e = Expense.query.get_or_404(expense_id)
     db.session.delete(e)
     db.session.commit()
-    flash("Expense deleted","success")
+    flash("Expense deleted", "success")
     return redirect(url_for("index"))
 
-
-@app.route('/edit/<int:expense_id>', methods=['GET'])
+# ---------------- EDIT ----------------
+@app.route("/edit/<int:expense_id>", methods=["GET"])
 def edit(expense_id):
     e = Expense.query.get_or_404(expense_id)
-
     return render_template(
         "edit.html",
         expense=e,
@@ -163,8 +167,7 @@ def edit(expense_id):
         today=dt_date.today().isoformat()
     )
 
-
-@app.route('/edit/<int:expense_id>', methods=['POST'])
+@app.route("/edit/<int:expense_id>", methods=["POST"])
 def edit_post(expense_id):
     e = Expense.query.get_or_404(expense_id)
 
@@ -184,53 +187,47 @@ def edit_post(expense_id):
 
     db.session.commit()
     flash("Expense updated successfully", "success")
-
     return redirect(url_for("index"))
 
-
+# ---------------- EXPORT CSV ----------------
 @app.route("/export.csv")
 def export_csv():
-    # 1 read query string
     start_str = (request.args.get("start") or "").strip()
-    end_str = request.args.get("end", "").strip()
-    selected_category= (request.args.get("category") or "").strip()
+    end_str = (request.args.get("end") or "").strip()
+    selected_category = (request.args.get("category") or "").strip()
 
-    # 2 parsing
-
-    start_date= parse_date_or_none(start_str)
-    end_date= parse_date_or_none(end_str)
+    start_date = parse_date_or_none(start_str)
+    end_date = parse_date_or_none(end_str)
 
     q = Expense.query
 
     if start_date:
-            q=q.filter(Expense.date>= start_date)
+        q = q.filter(Expense.date >= start_date)
     if end_date:
-            q= q.filter(Expense.date>=start_date)
+        q = q.filter(Expense.date <= end_date)
     if selected_category:
-            q=q.filter(Expense.category == selected_category)
+        q = q.filter(Expense.category == selected_category)
 
     expenses = q.order_by(Expense.date, Expense.id).all()
 
-    lines = ["date, description, category, amount"]
-
+    lines = ["date,description,category,amount"]
     for e in expenses:
-        lines.append(f"{e.date.isoformat()},{e.description}, {e.category},{e.amount:.2f}")
-    csv_data="\n".join(lines)
+        lines.append(
+            f"{e.date.isoformat()},{e.description},{e.category},{e.amount:.2f}"
+        )
 
-    fname_start= start_str or "all"
-    fname_end=end_str or "all"
-    filename= f"expenses_{fname_start}_to_{fname_end}.csv"
+    csv_data = "\n".join(lines)
 
     return Response(
         csv_data,
         headers={
-            "Content-Type":"text/csv",
-            "Content-Disposition": f"attachment; filename={filename}"
+            "Content-Type": "text/csv",
+            "Content-Disposition": "attachment; filename=expenses.csv"
         }
     )
 
-
-
-
-if __name__== "__main__":
+# ---------------- ENTRY POINT ----------------
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)

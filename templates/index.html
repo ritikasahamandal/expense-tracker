@@ -243,67 +243,84 @@
   const dayLabels = {{ (day_labels or []) | tojson }};
   const dayValues = {{ (day_values or []) | tojson }};
 
-  if (catLabels.length && catValues.length) {
-    const catCtx = document.getElementById('catChart').getContext('2d');
+  const CATEGORY_COLORS = [
+  "#60A5FA", // blue
+  "#34D399", // green
+  "#FBBF24", // yellow
+  "#F87171", // red
+  "#A78BFA", // purple
+  "#22D3EE"  // cyan (extra safety)
+];
 
-    new Chart(catCtx, {
-      type: 'pie',
-      data: {
-        labels: catLabels,
-        datasets: [{
-          data: catValues,
-          backgroundColor: [
-            '#f9a8d4', // soft rose
-  '#bae6fd', // light blue
-  '#1e3a8a', // dark blue
-  '#ec4899', // strong pink
-  '#a5b4fc'  // soft lavender (pairs perfectly with pink & blue)
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        plugins: {
-          legend: {
-            labels: {
-              color: '#cbd5e1'
-            }
+if (catLabels.length && catValues.length) {
+  const catCtx = document.getElementById("catChart").getContext("2d");
+
+  new Chart(catCtx, {
+    type: "pie",
+    data: {
+      labels: catLabels,
+      datasets: [{
+        data: catValues,
+        backgroundColor: catLabels.map(
+          (_, i) => CATEGORY_COLORS[i % CATEGORY_COLORS.length]
+        ),
+        borderColor: "#020617",
+        borderWidth: 2
+      }]
+    },
+    options: {
+      plugins: {
+        legend: {
+          labels: {
+            color: "#CBD5E1"
           }
         }
       }
-    });
-  }
+    }
+  });
+}
 
-  if (dayLabels.length && dayValues.length) {
-    const dayCtx = document.getElementById('dayChart').getContext('2d');
 
-    new Chart(dayCtx, {
-      type: 'bar',
-      data: {
-        labels: dayLabels,
-        datasets: [{
-          data: dayValues,
-          backgroundColor: [
-            '#fbcfe8', // light pink
-            '#f9a8d4', // soft rose
-            '#f472b6', // pink
-            '#ec4899', // strong pink
-            '#be185d'  // deep magenta
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        plugins: {
-          legend: {
-            labels: {
-              color: '#cbd5e1'
-            }
+if (dayLabels.length && dayValues.length) {
+  const dayCtx = document.getElementById("dayChart").getContext("2d");
+
+  new Chart(dayCtx, {
+    type: "line",
+    data: {
+      labels: dayLabels,
+      datasets: [{
+        label: "Daily Spending",
+        data: dayValues,
+        borderColor: "#22D3EE",
+        backgroundColor: "rgba(34, 211, 238, 0.25)",
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: "#22D3EE",
+        pointBorderColor: "#020617",
+        pointRadius: 4
+      }]
+    },
+    options: {
+      plugins: {
+        legend: {
+          labels: {
+            color: "#CBD5E1"
           }
         }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#CBD5E1" },
+          grid: { color: "rgba(148,163,184,0.2)" }
+        },
+        y: {
+          ticks: { color: "#CBD5E1" },
+          grid: { color: "rgba(148,163,184,0.2)" }
+        }
       }
-    });
-  }
+    }
+  });
+}
 
 </script>
 
