@@ -1,28 +1,27 @@
 from flask import (
     Flask, render_template, request,
-    url_for, flash, redirect, Response
+    redirect, url_for, flash, Response
 )
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date, datetime, date as dt_date
 from sqlalchemy import func
-import os
+from datetime import date, datetime, date as dt_date
 
 # ---------------- APP SETUP ----------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key")
+app.secret_key = "super-secret-key"
 
-# ---------------- DATABASE CONFIG ----------------
-db_url = os.environ.get("DATABASE_URL")
-
-# Fix Render postgres:// issue
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-# PostgreSQL in production, SQLite locally
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///expenses.db"
+# ---------------- DATABASE (SQLite ONLY) ----------------
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///expenses.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+
+# ---------------- AUTO CREATE TABLES (NO SHELL NEEDED) ----------------
+@app.before_request
+def create_tables_once():
+    if not hasattr(app, "_tables_created"):
+        db.create_all()
+        app._tables_created = True
 
 # ---------------- MODEL ----------------
 class Expense(db.Model):
@@ -58,7 +57,7 @@ def index():
         flash("End date cannot be before start date", "error")
         start_date = end_date = None
 
-    # ---------- BASE QUERY ----------
+    # Base query
     q = Expense.query
 
     if start_date:
@@ -71,7 +70,7 @@ def index():
     expenses = q.order_by(Expense.date.desc(), Expense.id.desc()).all()
     total = round(sum(e.amount for e in expenses), 2)
 
-    # ---------- CATEGORY WISE (PIE CHART) ----------
+    # Category-wise totals
     cat_rows = (
         db.session.query(
             Expense.category,
@@ -85,7 +84,7 @@ def index():
     cat_labels = [c for c, _ in cat_rows]
     cat_values = [round(float(s or 0), 2) for _, s in cat_rows]
 
-    # ---------- DATE WISE (SPENDING OVER TIME) ----------
+    # Spending over time (DATE-WISE)
     day_rows = (
         db.session.query(
             Expense.date,
@@ -115,7 +114,7 @@ def index():
         day_values=day_values
     )
 
-# ---------------- ADD ----------------
+# ---------------- ADD EXPENSE ----------------
 @app.route("/add", methods=["POST"])
 def add():
     description = (request.form.get("description") or "").strip()
@@ -124,7 +123,7 @@ def add():
     date_str = (request.form.get("date") or "").strip()
 
     if not description or not amount_str or not category:
-        flash("Please fill description, amount and category", "error")
+        flash("Please fill all required fields", "error")
         return redirect(url_for("index"))
 
     try:
@@ -140,7 +139,13 @@ def add():
     except ValueError:
         d = date.today()
 
-    e = Expense(description=description, amount=amount, category=category, date=d)
+    e = Expense(
+        description=description,
+        amount=amount,
+        category=category,
+        date=d
+    )
+
     db.session.add(e)
     db.session.commit()
 
@@ -226,8 +231,6 @@ def export_csv():
         }
     )
 
-# ---------------- ENTRY POINT ----------------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
