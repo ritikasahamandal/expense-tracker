@@ -1,49 +1,52 @@
-# Expense Tracker 🧾📊
+# 💸 Expense Tracker (Flask + SQLite)
 
-A simple **Expense Tracker web application** built using **Flask**, **Tailwind CSS**, and **Chart.js**.  
-This project helps users record their expenses and visualize spending patterns through charts.
+A simple and clean **Expense Tracker web application** built using **Flask** and **SQLAlchemy**.  
+This project allows users to track daily expenses, visualize spending patterns, and export data — all without any paid cloud services.
 
-> 🔧 This project is currently **not deployed** and runs locally.
+🔹 Designed for **college projects, learning backend development, and placement portfolios**.
 
 ---
 
-## 🚀 Features
+## 🚀 Live Demo
+🔗 https://expense-tracker-zh7z.onrender.com
 
-- Add and manage daily expenses
-- Categorize expenses
-- Visualize expenses using:
-  - Pie chart (Category-wise spending)
-  - Bar chart (Spending over time)
-- Clean and responsive UI using Tailwind CSS
-- SQLite database for data storage
+---
+
+## ✨ Features
+
+- ➕ Add, edit, and delete expenses
+- 🗂️ Categorize expenses (Food, Transport, Rent, Utilities, Health)
+- 📅 Filter expenses by date range and category
+- 📊 Visual analytics:
+  - Expense distribution by category (Pie chart)
+  - Spending over time (Line chart)
+- 📥 Export expenses as CSV
+- 🌙 Dark-themed dashboard UI
+- 🗄️ SQLite database (no external DB required)
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** HTML, Tailwind CSS, Chart.js
-- **Backend:** Python (Flask)
-- **Database:** SQLite
-- **Version Control:** Git & GitHub
+### Backend
+- Python
+- Flask
+- Flask-SQLAlchemy
+- Gunicorn
+
+### Database
+- SQLite
+
+### Frontend
+- HTML
+- CSS
+- JavaScript
+- Chart.js
+
+### Deployment
+- Render (Free Tier)
+- GitHub
 
 ---
 
----
-
-## ⚙️ How to Run Locally
-
-### Clone the repository
-
-git clone https://github.com/ritikasahamandal/expense-tracker.git 
-##
-cd expense-tracker
-
-## In windows
-python -m venv env
-##
-env\Scripts\activate
-##
-pip install flask flask-sqlalchemy
-##
-python app.py
 
